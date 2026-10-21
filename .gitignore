@@ -1,0 +1,12 @@
+# Segredos: NUNCA sobem para o GitHub
+.streamlit/secrets.toml
+.env
+
+# Arquivos gerados pelo Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Cache de login do spotipy
+.cache

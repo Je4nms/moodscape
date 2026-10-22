@@ -5,15 +5,25 @@ interage com a página (clica num botão, muda uma opção...).
 O que precisa sobreviver entre essas execuções fica em `st.session_state`.
 """
 
+import requests
 import spotipy
 import streamlit as st
 from spotipy.cache_handler import MemoryCacheHandler
 
-from moodscape import spotify
+from moodscape import features, spotify
+from moodscape.mood import classificar_humor
 
 st.set_page_config(page_title="Moodscape", page_icon="🎧")
 st.title("🎧 Moodscape")
 st.caption("A paisagem emocional do seu gosto musical")
+
+
+# Guarda o resultado por 1 dia: se a mesma lista de músicas for pedida de novo,
+# o Streamlit devolve a resposta salva em vez de chamar o ReccoBeats outra vez.
+@st.cache_data(ttl="1d", show_spinner="Buscando o humor das músicas...")
+def fetch_audio_features(spotify_ids: tuple[str, ...]) -> dict[str, dict]:
+    return features.get_audio_features(list(spotify_ids))
+
 
 # Cada visitante ganha o seu próprio "cofre" de token, guardado na sessão dele
 if "token_cache" not in st.session_state:
@@ -44,16 +54,36 @@ client = spotipy.Spotify(auth_manager=oauth)
 period = st.segmented_control(
     "Período", options=list(spotify.TIME_RANGES), default="Últimos 6 meses"
 )
-tracks = spotify.get_top_tracks(client, time_range=spotify.TIME_RANGES[period or "Últimos 6 meses"])
+tracks = spotify.get_top_tracks(
+    client, time_range=spotify.TIME_RANGES[period or "Últimos 6 meses"], limit=50
+)
+
+try:
+    audio_features = fetch_audio_features(tuple(track["id"] for track in tracks))
+except requests.RequestException:
+    st.warning("Não foi possível buscar o humor das músicas agora. Tente de novo mais tarde.")
+    audio_features = {}
+
+for track in tracks:
+    track_features = audio_features.get(track["id"])
+    if track_features:
+        track["mood"] = classificar_humor(track_features["valence"], track_features["energy"])
+    else:
+        track["mood"] = "❔ Não encontrado"
+
+# Cobertura: de quantas músicas o ReccoBeats conhecia o humor
+found = sum(1 for track in tracks if track["id"] in audio_features)
+st.metric("Músicas com humor encontrado", f"{found} de {len(tracks)}")
 
 st.subheader("Suas músicas mais ouvidas")
 st.dataframe(
     tracks,
-    column_order=["cover", "name", "artists", "album"],
+    column_order=["cover", "name", "artists", "mood", "album"],
     column_config={
         "cover": st.column_config.ImageColumn(""),
         "name": "Música",
         "artists": "Artista",
+        "mood": "Humor",
         "album": "Álbum",
     },
     hide_index=True,

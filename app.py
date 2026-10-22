@@ -10,7 +10,7 @@ import spotipy
 import streamlit as st
 from spotipy.cache_handler import MemoryCacheHandler
 
-from moodscape import features, spotify
+from moodscape import data, features, spotify
 from moodscape.mood import classificar_humor
 
 st.set_page_config(page_title="Moodscape", page_icon="🎧")
@@ -58,22 +58,28 @@ tracks = spotify.get_top_tracks(
     client, time_range=spotify.TIME_RANGES[period or "Últimos 6 meses"], limit=50
 )
 
+track_ids = tuple(track["id"] for track in tracks)
 try:
-    audio_features = fetch_audio_features(tuple(track["id"] for track in tracks))
+    reccobeats_features = fetch_audio_features(track_ids)
 except requests.RequestException:
     st.warning("Não foi possível buscar o humor das músicas agora. Tente de novo mais tarde.")
-    audio_features = {}
+    reccobeats_features = {}
+
+# Plano reserva: a planilha só é consultada para as músicas que o ReccoBeats não conhecia
+missing_ids = [track_id for track_id in track_ids if track_id not in reccobeats_features]
+dataset_features = data.lookup_audio_features(missing_ids)
 
 for track in tracks:
-    track_features = audio_features.get(track["id"])
+    track_features = reccobeats_features.get(track["id"]) or dataset_features.get(track["id"])
     if track_features:
         track["mood"] = classificar_humor(track_features["valence"], track_features["energy"])
     else:
         track["mood"] = "❔ Não encontrado"
 
-# Cobertura: de quantas músicas o ReccoBeats conhecia o humor
-found = sum(1 for track in tracks if track["id"] in audio_features)
+# Cobertura: de quantas músicas conseguimos o humor, e de qual fonte veio
+found = len(reccobeats_features) + len(dataset_features)
 st.metric("Músicas com humor encontrado", f"{found} de {len(tracks)}")
+st.caption(f"ReccoBeats: {len(reccobeats_features)} · Planilha: {len(dataset_features)}")
 
 st.subheader("Suas músicas mais ouvidas")
 st.dataframe(

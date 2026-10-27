@@ -8,7 +8,9 @@ from pathlib import Path
 
 import duckdb
 
-DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "tracks_mood.csv"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_PATH = DATA_DIR / "tracks_mood.csv"
+DEMO_PATH = DATA_DIR / "demo_tracks.csv"
 
 
 def lookup_audio_features(spotify_ids: list[str]) -> dict[str, dict]:
@@ -26,3 +28,12 @@ def lookup_audio_features(spotify_ids: list[str]) -> dict[str, dict]:
         [spotify_ids],
     ).fetchall()
     return {track_id: {"valence": valence, "energy": energy} for track_id, valence, energy in rows}
+
+
+def load_demo_tracks() -> list[dict]:
+    """Músicas aleatórias da planilha, usadas no modo demonstração (sem login)."""
+    if not DEMO_PATH.exists():
+        return []
+
+    demo = duckdb.sql(f"SELECT * FROM read_csv('{DEMO_PATH}')")
+    return [dict(zip(demo.columns, row), cover=None) for row in demo.fetchall()]

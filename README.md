@@ -4,7 +4,7 @@
 
 O Moodscape conecta na sua conta do Spotify, descobre como soam as músicas que você ouve e desenha um **mapa de humor** do seu gosto musical.
 
-🔗 **Acesse:** _link em breve_ (clique em **Ver demonstração** para usar sem login)
+🔗 **Acesse:** <https://moodscape-je4nms.streamlit.app> (clique em **Ver demonstração** para usar sem login)
 
 ## O que ele faz
 
